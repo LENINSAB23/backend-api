@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Grupo Rino E.I.R.L. | Dashboard de Despacho & Telemetría IoT</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <!-- Leaflet CSS for Maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- HEADER NAVBAR -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-logo">
+          <i class="fa-solid fa-truck-fast"></i>
+        </div>
+        <div class="brand-text">
+          <h1>GRUPO RINO <span>E.I.R.L.</span></h1>
+          <p>Plataforma de Despacho, IA & Telemetría IoT</p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="header-nav">
+        <button class="nav-tab active" data-tab="orders">
+          <i class="fa-solid fa-clipboard-list"></i> Monitoreo de Órdenes
+        </button>
+        <button class="nav-tab" data-tab="map">
+          <i class="fa-solid fa-map-location-dot"></i> Mapa Satelital IoT
+        </button>
+        <button class="nav-tab" data-tab="catalog">
+          <i class="fa-solid fa-gears"></i> Catálogo de Repuestos
+        </button>
+        <button class="nav-tab" data-tab="simulator">
+          <i class="fa-solid fa-tower-cell"></i> Simulador Telemático
+        </button>
+      </nav>
+
+      <div class="header-status">
+        <div class="status-badge connected" id="api-status-badge">
+          <span class="pulse-dot"></span>
+          <span id="api-status-text">Backend API Conectado</span>
+        </div>
+        <button class="btn btn-outline" id="refresh-btn" title="Actualizar datos">
+          <i class="fa-solid fa-arrows-rotate"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- METRICS SUMMARY BAR -->
+    <section class="metrics-bar">
+      <div class="metric-card">
+        <div class="metric-icon pending">
+          <i class="fa-solid fa-clock"></i>
+        </div>
+        <div class="metric-info">
+          <span class="metric-label">Pendientes</span>
+          <h3 class="metric-value" id="metric-pending">0</h3>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon cooking">
+          <i class="fa-solid fa-wrench"></i>
+        </div>
+        <div class="metric-info">
+          <span class="metric-label">En Taller / Almacén</span>
+          <h3 class="metric-value" id="metric-cooking">0</h3>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon transit">
+          <i class="fa-solid fa-motorcycle"></i>
+        </div>
+        <div class="metric-info">
+          <span class="metric-label">En Ruta (IoT)</span>
+          <h3 class="metric-value" id="metric-transit">0</h3>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon delivered">
+          <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div class="metric-info">
+          <span class="metric-label">Entregados Hoy</span>
+          <h3 class="metric-value" id="metric-delivered">0</h3>
+        </div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-icon revenue">
+          <i class="fa-solid fa-sack-dollar"></i>
+        </div>
+        <div class="metric-info">
+          <span class="metric-label">Ventas Totales</span>
+          <h3 class="metric-value" id="metric-revenue">S/ 0.00</h3>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAIN CONTENT AREA -->
+    <main class="content-area">
+
+      <!-- TAB 1: MONITOREO DE ÓRDENES (KANBAN) -->
+      <div class="tab-pane active" id="tab-orders">
+        <div class="tab-header">
+          <h2><i class="fa-solid fa-kanban"></i> Tablero de Control de Despacho</h2>
+          <div class="tab-actions">
+            <button class="btn btn-primary" id="btn-new-order-modal">
+              <i class="fa-solid fa-plus"></i> Nueva Orden Manual
+            </button>
+          </div>
+        </div>
+
+        <div class="kanban-board">
+          <!-- Columna 1: Pendiente -->
+          <div class="kanban-column" id="col-pending">
+            <div class="column-header pending">
+              <span class="col-title"><i class="fa-solid fa-receipt"></i> Pendiente</span>
+              <span class="col-count" id="count-pending">0</span>
+            </div>
+            <div class="column-cards" id="cards-pending"></div>
+          </div>
+
+          <!-- Columna 2: En Taller / Preparación -->
+          <div class="kanban-column" id="col-cooking">
+            <div class="column-header cooking">
+              <span class="col-title"><i class="fa-solid fa-boxes-packing"></i> En Almacén / Taller</span>
+              <span class="col-count" id="count-cooking">0</span>
+            </div>
+            <div class="column-cards" id="cards-cooking"></div>
+          </div>
+
+          <!-- Columna 3: En Ruta -->
+          <div class="kanban-column" id="col-transit">
+            <div class="column-header transit">
+              <span class="col-title"><i class="fa-solid fa-motorcycle"></i> En Ruta (IoT GPS)</span>
+              <span class="col-count" id="count-transit">0</span>
+            </div>
+            <div class="column-cards" id="cards-transit"></div>
+          </div>
+
+          <!-- Columna 4: Entregado -->
+          <div class="kanban-column" id="col-delivered">
+            <div class="column-header delivered">
+              <span class="col-title"><i class="fa-solid fa-check-double"></i> Entregado</span>
+              <span class="col-count" id="count-delivered">0</span>
+            </div>
+            <div class="column-cards" id="cards-delivered"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: MAPA SATELITAL IOT EN TIEMPO REAL -->
+      <div class="tab-pane" id="tab-map">
+        <div class="map-layout">
+          <div class="map-container-wrapper">
+            <div class="map-toolbar">
+              <div class="toolbar-title">
+                <i class="fa-solid fa-satellite-dish"></i> Monitoreo GPS Satelital - Huánuco
+              </div>
+              <div class="map-legend">
+                <span class="legend-item"><span class="legend-dot driver-dot"></span> Repartidor (IoT Node)</span>
+                <span class="legend-item"><span class="legend-dot order-dot"></span> Destino de Entrega</span>
+              </div>
+            </div>
+            <div id="live-map"></div>
+          </div>
+
+          <!-- Telemetry Live Feed Panel -->
+          <div class="telemetry-panel">
+            <div class="panel-header">
+              <h3><i class="fa-solid fa-microchip"></i> Telemetría IoT en Vivo</h3>
+              <span class="live-indicator"><span class="pulse"></span> LIVE</span>
+            </div>
+
+            <div class="driver-select-box">
+              <label for="map-driver-select">Repartidor Activo:</label>
+              <select id="map-driver-select" class="form-control">
+                <option value="">Cargando repartidores...</option>
+              </select>
+            </div>
+
+            <div class="telemetry-metrics-grid" id="telemetry-metrics">
+              <div class="t-card">
+                <span class="t-label">Latitud</span>
+                <span class="t-val" id="t-lat">-9.9306</span>
+              </div>
+              <div class="t-card">
+                <span class="t-label">Longitud</span>
+                <span class="t-val" id="t-lng">-76.2422</span>
+              </div>
+              <div class="t-card">
+                <span class="t-label">Velocidad</span>
+                <span class="t-val" id="t-speed">0 km/h</span>
+              </div>
+              <div class="t-card">
+                <span class="t-label">Batería</span>
+                <span class="t-val" id="t-battery">--%</span>
+              </div>
+            </div>
+
+            <div class="telemetry-log-box">
+              <div class="log-title"><i class="fa-solid fa-terminal"></i> Log de Paquetes Telemáticos:</div>
+              <ul class="log-list" id="telemetry-log-list">
+                <li class="log-item empty">Esperando señales GPS del smartphone...</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: CATÁLOGO DE PRODUCTOS -->
+      <div class="tab-pane" id="tab-catalog">
+        <div class="tab-header">
+          <h2><i class="fa-solid fa-boxes-stacked"></i> Catálogo de Productos y Precios</h2>
+          <div class="tab-actions">
+            <button class="btn btn-primary" id="btn-new-product-modal">
+              <i class="fa-solid fa-plus"></i> Agregar Producto
+            </button>
+          </div>
+        </div>
+
+        <div class="catalog-grid" id="catalog-products-grid">
+          <!-- Dynamic product cards -->
+        </div>
+      </div>
+
+      <!-- TAB 4: SIMULADOR IOT -->
+      <div class="tab-pane" id="tab-simulator">
+        <div class="simulator-card">
+          <div class="sim-header">
+            <h2><i class="fa-solid fa-tower-broadcast"></i> Simulador Telemático IoT (Nodo Repartidor)</h2>
+            <p>Emula el sensor GPS del smartphone del repartidor enviando datos reales a <code>POST /api/telemetry/location</code></p>
+          </div>
+
+          <div class="sim-body">
+            <div class="sim-form-grid">
+              <div class="form-group">
+                <label>Seleccionar Repartidor:</label>
+                <select id="sim-driver-id" class="form-control"></select>
+              </div>
+
+              <div class="form-group">
+                <label>Asignar a Pedido:</label>
+                <select id="sim-order-id" class="form-control"></select>
+              </div>
+
+              <div class="form-group">
+                <label>Velocidad Simulada (km/h):</label>
+                <input type="number" id="sim-speed" class="form-control" value="28" min="0" max="80">
+              </div>
+
+              <div class="form-group">
+                <label>Nivel de Batería (%):</label>
+                <input type="number" id="sim-battery" class="form-control" value="85" min="1" max="100">
+              </div>
+            </div>
+
+            <div class="sim-controls">
+              <button class="btn btn-success btn-lg" id="btn-start-sim">
+                <i class="fa-solid fa-play"></i> Iniciar Simulación GPS
+              </button>
+              <button class="btn btn-danger btn-lg" id="btn-stop-sim" disabled>
+                <i class="fa-solid fa-square"></i> Detener Simulación
+              </button>
+              <button class="btn btn-secondary btn-lg" id="btn-send-single-telemetry">
+                <i class="fa-solid fa-paper-plane"></i> Enviar Paquete Único
+              </button>
+            </div>
+
+            <div class="sim-status-box" id="sim-status-box">
+              <i class="fa-solid fa-info-circle"></i> Estado: Simulador detenido.
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- MODAL: ASIGNAR REPARTIDOR -->
+  <div class="modal-overlay" id="modal-assign-driver">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-user-check"></i> Asignar Repartidor</h3>
+        <button class="modal-close" data-close="modal-assign-driver">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="assign-order-id" />
+        <p>Selecciona un repartidor disponible para llevar la orden <strong id="assign-order-number"></strong>:</p>
+        <div class="form-group mt-3">
+          <label>Repartidor:</label>
+          <select id="assign-driver-select" class="form-control"></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close="modal-assign-driver">Cancelar</button>
+        <button class="btn btn-primary" id="btn-confirm-assign">Confirmar & Enviar a Ruta</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: DETALLE DE PEDIDO -->
+  <div class="modal-overlay" id="modal-order-detail">
+    <div class="modal-box modal-lg">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-file-invoice"></i> Detalle de Pedido <span id="detail-order-number"></span></h3>
+        <button class="modal-close" data-close="modal-order-detail">&times;</button>
+      </div>
+      <div class="modal-body" id="detail-modal-body">
+        <!-- Dynamic content -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-close="modal-order-detail">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NUEVO PRODUCTO -->
+  <div class="modal-overlay" id="modal-new-product">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-plus-circle"></i> Nuevo Producto</h3>
+        <button class="modal-close" data-close="modal-new-product">&times;</button>
+      </div>
+      <form id="form-new-product">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Categoría:</label>
+            <select id="prod-category" class="form-control" required></select>
+          </div>
+          <div class="form-group">
+            <label>Nombre del Producto / Repuesto:</label>
+            <input type="text" id="prod-name" class="form-control" placeholder="Ej: Aceite Sintético Mobil 1 5W-30" required />
+          </div>
+          <div class="form-group">
+            <label>Descripción y Compatibilidad:</label>
+            <textarea id="prod-description" class="form-control" rows="2" placeholder="Especificaciones técnicas y compatibilidad con autos/motos"></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group half">
+              <label>Precio (S/):</label>
+              <input type="number" step="0.50" id="prod-price" class="form-control" placeholder="25.00" required />
+            </div>
+            <div class="form-group half">
+              <label>Tiempo Prep. (min):</label>
+              <input type="number" id="prod-prep" class="form-control" value="15" required />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>URL Imagen (Opcional):</label>
+            <input type="text" id="prod-image" class="form-control" placeholder="https://..." />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="modal-new-product">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Producto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Main Script -->
+  <script src="app.js"></script>
+</body>
+</html>
