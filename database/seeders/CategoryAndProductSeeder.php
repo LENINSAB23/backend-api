@@ -63,7 +63,7 @@ class CategoryAndProductSeeder extends Seeder
                 'name' => 'Repuestos para Autos',
                 'slug' => 'repuestos-autos',
                 'description' => 'Pastillas de freno, bujías, amortiguadores y repuestos de alta gama para automóviles y SUVs.',
-                'image_url' => 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=500',
+                'image_url' => 'https://images.unsplash.com/photo-1600793575654-910699b5e4d4?w=500',
                 'products' => [
                     [
                         'name' => 'Pastillas de Freno Cerámicas Fras-le (Juego Delantero Auto)',
@@ -91,14 +91,14 @@ class CategoryAndProductSeeder extends Seeder
                         'description' => 'Control de estabilidad superior y confort en baches y terrenos irregulares.',
                         'price' => 320.00,
                         'prep_time_minutes' => 20,
-                        'image_url' => 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=500',
+                        'image_url' => 'https://images.unsplash.com/photo-1600793575654-910699b5e4d4?w=500',
                     ],
                     [
                         'name' => 'Kit de Embrague Valeo (Disco, Plato y Collarín)',
                         'description' => 'Transmisión suave de torque, larga vida útil y resistencia al recalentamiento.',
                         'price' => 380.00,
                         'prep_time_minutes' => 25,
-                        'image_url' => 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=500',
+                        'image_url' => 'https://images.unsplash.com/photo-1600793575654-910699b5e4d4?w=500',
                     ],
                 ],
             ],
@@ -127,7 +127,7 @@ class CategoryAndProductSeeder extends Seeder
                         'description' => 'Sellada libre de ácido líquido, a prueba de vibraciones y derrames en motos y cuatrimotos.',
                         'price' => 115.00,
                         'prep_time_minutes' => 10,
-                        'image_url' => 'https://images.unsplash.com/photo-1597762127827-0242a8b34015?w=500',
+                        'image_url' => 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=500',
                     ],
                     [
                         'name' => 'Bujía Especial para Moto NGK CPR8EA-9',
@@ -149,14 +149,14 @@ class CategoryAndProductSeeder extends Seeder
                 'name' => 'Baterías & Sistema Eléctrico',
                 'slug' => 'baterias-electricos',
                 'description' => 'Baterías de libre mantenimiento, focos LED y alternadores para autos y motos.',
-                'image_url' => 'https://images.unsplash.com/photo-1597762127827-0242a8b34015?w=500',
+                'image_url' => 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=500',
                 'products' => [
                     [
                         'name' => 'Batería Capsa Gold 13 Placas Libre Mantenimiento (Auto/Camioneta)',
                         'description' => 'Potencia de arranque superior en frío. 12V 65Ah con garantía de 18 meses.',
                         'price' => 280.00,
                         'prep_time_minutes' => 15,
-                        'image_url' => 'https://images.unsplash.com/photo-1597762127827-0242a8b34015?w=500',
+                        'image_url' => 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=500',
                     ],
                     [
                         'name' => 'Kit de Focos LED H4 Philips Ultinon Essential (Par)',
@@ -170,7 +170,7 @@ class CategoryAndProductSeeder extends Seeder
                         'description' => 'Fusibles mini y estándar de 5A a 30A con extractor para tablero y caja de fusibles.',
                         'price' => 25.00,
                         'prep_time_minutes' => 5,
-                        'image_url' => 'https://images.unsplash.com/photo-1597762127827-0242a8b34015?w=500',
+                        'image_url' => 'https://images.unsplash.com/photo-1542282088-72c9c27ed0cd?w=500',
                     ],
                 ],
             ],
@@ -192,7 +192,7 @@ class CategoryAndProductSeeder extends Seeder
                         'description' => 'Estructura de acero reforzado, elevación rápida de perfil bajo para autos y camionetas.',
                         'price' => 195.00,
                         'prep_time_minutes' => 15,
-                        'image_url' => 'https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=500',
+                        'image_url' => 'https://images.unsplash.com/photo-1600793575654-910699b5e4d4?w=500',
                     ],
                     [
                         'name' => 'Juego de Llaves y Dados Mecánicos Cr-V 46 Piezas',
