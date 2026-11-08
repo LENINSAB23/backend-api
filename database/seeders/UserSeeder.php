@@ -45,7 +45,7 @@ class UserSeeder extends Seeder
             ]
         );
 
-        // Cliente demo
+        // Cliente inicial
         User::firstOrCreate(
             ['email' => 'cliente@gmail.com'],
             [
