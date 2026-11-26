@@ -9,6 +9,7 @@ use App\Services\GeminiService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ChatController extends Controller
@@ -120,27 +121,31 @@ class ChatController extends Controller
             ], 404);
         }
 
-        // Store user message
-        $userMessage = $conversation->messages()->create([
-            'role' => 'user',
-            'content' => $text,
-        ]);
-
-        // Auto-update conversation title if it's the first message or still default
-        if ($conversation->title === 'Nueva conversación' || $conversation->messages()->count() <= 2) {
-            $cleanedTitle = Str::limit(preg_replace('/\s+/', ' ', $text), 45, '...');
-            $conversation->update(['title' => $cleanedTitle]);
-        }
-
         try {
+            // Ask Gemini first: the history sent is the stored messages plus this new one,
+            // and nothing is persisted if the request fails.
             $aiReply = $this->geminiService->chat($conversation, $text);
 
-            $botMessage = $conversation->messages()->create([
-                'role' => 'model',
-                'content' => $aiReply,
-            ]);
+            [$userMessage, $botMessage] = DB::transaction(function () use ($conversation, $text, $aiReply) {
+                $userMessage = $conversation->messages()->create([
+                    'role' => 'user',
+                    'content' => $text,
+                ]);
 
-            $conversation->touch();
+                $botMessage = $conversation->messages()->create([
+                    'role' => 'model',
+                    'content' => $aiReply,
+                ]);
+
+                // Only replace the placeholder title, never one the user chose.
+                if ($conversation->title === 'Nueva conversación') {
+                    $conversation->title = Str::limit(preg_replace('/\s+/', ' ', $text), 45, '...');
+                }
+
+                $conversation->touch();
+
+                return [$userMessage, $botMessage];
+            });
 
             return response()->json([
                 'status' => 'success',
@@ -152,9 +157,6 @@ class ChatController extends Controller
                 ],
             ]);
         } catch (Exception $e) {
-            // Delete the unfulfilled user message to avoid orphaned unanswered messages on failure
-            $userMessage->delete();
-
             $statusCode = 502;
             $msg = $e->getMessage();
             if (str_contains($msg, '429') || str_contains(strtolower($msg), 'cuota')) {

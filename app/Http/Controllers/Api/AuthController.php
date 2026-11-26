@@ -16,7 +16,6 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:6',
-            'role' => 'nullable|string|in:admin,customer,driver',
             'phone' => 'nullable|string|max:30',
         ]);
 
@@ -24,7 +23,7 @@ class AuthController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
-            'role' => $validated['role'] ?? 'customer',
+            'role' => 'customer',
             'phone' => $validated['phone'] ?? null,
             'avatar' => 'https://ui-avatars.com/api/?name='.urlencode($validated['name']).'&background=random',
         ]);

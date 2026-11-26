@@ -9,6 +9,11 @@ use RuntimeException;
 
 class GeminiService
 {
+    /**
+     * Respuesta fija cuando la consulta no pertenece al rubro automotriz ni a la app.
+     */
+    public const OUT_OF_DOMAIN_REPLY = 'Disculpa, solo estoy capacitado para responder consultas relacionadas con la aplicación de Grupo Rino, repuestos de autos y motos, catálogo, seguimiento de pedidos y asesoría mecánica. ¿En qué repuesto o función de la app te puedo orientar?';
+
     protected string $apiKey;
 
     protected string $model;
@@ -59,13 +64,25 @@ class GeminiService
             ],
             'contents' => $contents,
             'generationConfig' => [
-                'temperature' => 0.7,
+                'temperature' => 0.4,
                 'topK' => 40,
                 'topP' => 0.95,
                 'maxOutputTokens' => 1024,
             ],
         ];
 
+        return $this->send($url, $payload);
+    }
+
+    /**
+     * Send a payload to Gemini and return the response text.
+     *
+     * @param  array<string, mixed>  $payload
+     *
+     * @throws RuntimeException
+     */
+    protected function send(string $url, array $payload): string
+    {
         try {
             $response = Http::withHeaders([
                 'Content-Type' => 'application/json',
@@ -166,15 +183,72 @@ class GeminiService
     }
 
     /**
+     * Domain filter run in the backend before answering: a separate, strict call
+     * (temperature 0, no conversation history) classifies only the new message.
+     * Conversation context cannot convince it to answer off-topic requests.
+     * If the classifier fails, the request continues and the system prompt still applies.
+     */
+    public function isInDomain(string $message, ?string $previousUserMessage = null): bool
+    {
+        if (trim($this->apiKey) === '') {
+            return true;
+        }
+
+        $context = $previousUserMessage !== null && trim($previousUserMessage) !== ''
+            ? "Mensaje anterior del usuario (solo como contexto): \"{$previousUserMessage}\"
+"
+            : '';
+
+        $payload = [
+            'systemInstruction' => [
+                'parts' => [[
+                    'text' => 'Eres un clasificador. Decide si el NUEVO mensaje del usuario es una consulta válida para RinoBot, '
+                        .'asistente de Grupo Rino (venta de repuestos, lubricantes y accesorios para autos y motos, taller mecánico, '
+                        .'uso de la app: catálogo, carrito, pagos, pedidos, rastreo GPS y tiempo de entrega). '
+                        .'Saludos, agradecimientos y preguntas de seguimiento sobre esos temas son válidos. '
+                        .'Recetas, tareas escolares, política, deportes, salud, programación u otros temas ajenos NO son válidos, '
+                        .'aunque el mensaje anterior sí lo fuera. Responde únicamente SI o NO.',
+                ]],
+            ],
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [['text' => $context."Nuevo mensaje: \"{$message}\""]],
+            ]],
+            'generationConfig' => [
+                'temperature' => 0,
+                'maxOutputTokens' => 5,
+            ],
+        ];
+
+        try {
+            $verdict = $this->send("{$this->baseUrl}/models/{$this->model}:generateContent", $payload);
+        } catch (RuntimeException) {
+            return true;
+        }
+
+        return ! str_starts_with(mb_strtoupper(trim($verdict)), 'NO');
+    }
+
+    /**
      * Ask Gemini within a conversation context.
      */
     public function chat(Conversation $conversation, string $newMessage): string
     {
-        // Load recent messages (last 20 to preserve context without exceeding token window)
+        $previousUserMessage = $conversation->messages()
+            ->where('role', 'user')
+            ->orderBy('id', 'desc')
+            ->value('content');
+
+        if (! $this->isInDomain($newMessage, $previousUserMessage)) {
+            return self::OUT_OF_DOMAIN_REPLY;
+        }
+
+        // Load the 20 most recent messages, then restore chronological order for Gemini
         $recentMessages = $conversation->messages()
-            ->orderBy('id', 'asc')
+            ->orderBy('id', 'desc')
             ->take(20)
-            ->get();
+            ->get()
+            ->reverse();
 
         $contents = $this->formatContents($recentMessages, $newMessage);
 

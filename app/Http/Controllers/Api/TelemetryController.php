@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\DriverTelemetry;
 use App\Models\Order;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 
 class TelemetryController extends Controller
 {
@@ -14,9 +16,10 @@ class TelemetryController extends Controller
      */
     public function storeLocation(Request $request)
     {
+        $driver = $request->user();
+
         $validated = $request->validate([
-            'driver_id' => 'required|exists:users,id',
-            'order_id' => 'nullable|exists:orders,id',
+            'order_id' => ['nullable', Rule::exists('orders', 'id')->where('driver_id', $driver->id)],
             'latitude' => 'required|numeric',
             'longitude' => 'required|numeric',
             'altitude' => 'nullable|numeric',
@@ -26,7 +29,7 @@ class TelemetryController extends Controller
         ]);
 
         $telemetry = DriverTelemetry::create([
-            'driver_id' => $validated['driver_id'],
+            'driver_id' => $driver->id,
             'order_id' => $validated['order_id'] ?? null,
             'latitude' => $validated['latitude'],
             'longitude' => $validated['longitude'],
@@ -71,6 +74,8 @@ class TelemetryController extends Controller
     public function orderTracking($orderId)
     {
         $order = Order::with('driver')->findOrFail($orderId);
+
+        Gate::authorize('view', $order);
 
         $telemetries = DriverTelemetry::where('order_id', $orderId)
             ->orWhere(function ($query) use ($order) {

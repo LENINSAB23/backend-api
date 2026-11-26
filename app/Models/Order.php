@@ -32,6 +32,8 @@ class Order extends Model
     ];
 
     protected $casts = [
+        'customer_id' => 'integer',
+        'driver_id' => 'integer',
         'delivery_latitude' => 'decimal:7',
         'delivery_longitude' => 'decimal:7',
         'subtotal' => 'decimal:2',

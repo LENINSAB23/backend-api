@@ -34,9 +34,9 @@ class OrderSeeder extends Seeder
                 'status' => 'in_transit',
                 'payment_method' => 'yape',
                 'payment_status' => 'paid',
-                'subtotal' => 56.00,
+                'subtotal' => 0,
                 'delivery_fee' => 5.00,
-                'total' => 61.00,
+                'total' => 0,
                 'estimated_delivery_minutes' => 22,
                 'estimated_delivery_at' => now()->addMinutes(15),
                 'notes' => 'Tocar el timbre del 2do piso.',
@@ -77,9 +77,9 @@ class OrderSeeder extends Seeder
                 'status' => 'cooking',
                 'payment_method' => 'card',
                 'payment_status' => 'paid',
-                'subtotal' => 38.00,
+                'subtotal' => 0,
                 'delivery_fee' => 5.00,
-                'total' => 43.00,
+                'total' => 0,
                 'estimated_delivery_minutes' => 30,
                 'estimated_delivery_at' => now()->addMinutes(25),
                 'notes' => 'Verificar compatibilidad con modelo 2022 y entregar en taller.',
@@ -97,7 +97,7 @@ class OrderSeeder extends Seeder
         );
 
         // Order 3: Pending
-        Order::firstOrCreate(
+        $order3 = Order::firstOrCreate(
             ['order_number' => 'RINO-20261010-003'],
             [
                 'customer_id' => null,
@@ -110,12 +110,42 @@ class OrderSeeder extends Seeder
                 'status' => 'pending',
                 'payment_method' => 'yape',
                 'payment_status' => 'pending',
-                'subtotal' => 26.50,
+                'subtotal' => 0,
                 'delivery_fee' => 5.00,
-                'total' => 31.50,
+                'total' => 0,
                 'estimated_delivery_minutes' => 25,
                 'notes' => 'Pedido registrado vía WhatsApp Chatbot.',
             ]
         );
+
+        if ($products->count() >= 3) {
+            OrderItem::firstOrCreate(
+                ['order_id' => $order3->id, 'product_id' => $products[2]->id],
+                [
+                    'product_name' => $products[2]->name,
+                    'quantity' => 1,
+                    'unit_price' => $products[2]->price,
+                    'subtotal' => $products[2]->price,
+                ]
+            );
+        }
+
+        foreach ([$order1, $order2, $order3] as $order) {
+            $this->syncTotalsWithItems($order);
+        }
+    }
+
+    /**
+     * Calcula subtotal y total a partir de los productos del pedido,
+     * para que lo mostrado en la app coincida con el detalle.
+     */
+    private function syncTotalsWithItems(Order $order): void
+    {
+        $subtotal = (float) $order->items()->sum('subtotal');
+
+        $order->update([
+            'subtotal' => $subtotal,
+            'total' => $subtotal + (float) $order->delivery_fee,
+        ]);
     }
 }

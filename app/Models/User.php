@@ -36,6 +36,16 @@ class User extends Authenticatable
         ];
     }
 
+    public function isAdmin(): bool
+    {
+        return $this->role === 'admin';
+    }
+
+    public function isDriver(): bool
+    {
+        return $this->role === 'driver';
+    }
+
     public function ordersAsCustomer(): HasMany
     {
         return $this->hasMany(Order::class, 'customer_id');

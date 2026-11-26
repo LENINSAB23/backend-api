@@ -30,18 +30,6 @@ Route::get('/categories/{id}', [CategoryController::class, 'show']);
 Route::get('/products', [ProductController::class, 'index']);
 Route::get('/products/{id}', [ProductController::class, 'show']);
 
-// Rutas de Gestión de Pedidos (Accesibles para App Cliente y Chatbot LLM)
-Route::get('/orders', [OrderController::class, 'index']);
-Route::get('/orders/{id}', [OrderController::class, 'show']);
-Route::post('/orders', [OrderController::class, 'store']);
-Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
-Route::put('/orders/{id}/assign-driver', [OrderController::class, 'assignDriver']);
-
-// Componente IoT: Telemetría y Rastreo Satelital GPS
-Route::post('/telemetry/location', [TelemetryController::class, 'storeLocation']);
-Route::get('/telemetry/latest/{driverId}', [TelemetryController::class, 'latestDriverLocation']);
-Route::get('/telemetry/order/{orderId}', [TelemetryController::class, 'orderTracking']);
-
 // Rutas Protegidas por Sanctum
 Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('auth')->group(function () {
@@ -49,14 +37,28 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
     });
 
-    // Operaciones Administrativas
-    Route::post('/categories', [CategoryController::class, 'store']);
-    Route::put('/categories/{id}', [CategoryController::class, 'update']);
-    Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+    // Gestión de Pedidos (cada rol ve solo lo que le corresponde, ver OrderPolicy)
+    Route::get('/orders', [OrderController::class, 'index']);
+    Route::get('/orders/{id}', [OrderController::class, 'show']);
+    Route::post('/orders', [OrderController::class, 'store']);
+    Route::put('/orders/{id}/status', [OrderController::class, 'updateStatus']);
+    Route::put('/orders/{id}/assign-driver', [OrderController::class, 'assignDriver']);
 
-    Route::post('/products', [ProductController::class, 'store']);
-    Route::put('/products/{id}', [ProductController::class, 'update']);
-    Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    // Componente IoT: Telemetría y Rastreo Satelital GPS
+    Route::post('/telemetry/location', [TelemetryController::class, 'storeLocation'])->middleware('role:driver');
+    Route::get('/telemetry/latest/{driverId}', [TelemetryController::class, 'latestDriverLocation'])->middleware('role:admin');
+    Route::get('/telemetry/order/{orderId}', [TelemetryController::class, 'orderTracking']);
+
+    // Operaciones Administrativas
+    Route::middleware('role:admin')->group(function () {
+        Route::post('/categories', [CategoryController::class, 'store']);
+        Route::put('/categories/{id}', [CategoryController::class, 'update']);
+        Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+
+        Route::post('/products', [ProductController::class, 'store']);
+        Route::put('/products/{id}', [ProductController::class, 'update']);
+        Route::delete('/products/{id}', [ProductController::class, 'destroy']);
+    });
 
     // Chat con Inteligencia Artificial (Google Gemini)
     Route::prefix('chat')->group(function () {

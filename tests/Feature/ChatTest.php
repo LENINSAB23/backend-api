@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Services\GeminiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
@@ -132,6 +133,106 @@ class ChatTest extends TestCase
         // Assert conversation title was auto-updated from first message
         $conversation->refresh();
         $this->assertStringContainsString('¿Tienen bujías', $conversation->title);
+    }
+
+    public function test_new_message_is_sent_to_gemini_only_once(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::factory()->create(['user_id' => $user->id]);
+        Sanctum::actingAs($user);
+        $this->fakeGeminiReply('Respuesta');
+
+        $this->postJson("/api/chat/conversations/{$conversation->id}/messages", [
+            'message' => 'Hola RinoBot',
+        ])->assertOk();
+
+        Http::assertSent(function ($request) {
+            $contents = $request->data()['contents'];
+
+            return count($contents) === 1 && $contents[0]['parts'][0]['text'] === 'Hola RinoBot';
+        });
+    }
+
+    public function test_gemini_receives_the_most_recent_history(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::factory()->create(['user_id' => $user->id]);
+
+        foreach (range(1, 30) as $number) {
+            Message::factory()->create([
+                'conversation_id' => $conversation->id,
+                'role' => $number % 2 === 1 ? 'user' : 'model',
+                'content' => "Mensaje {$number}",
+            ]);
+        }
+
+        Sanctum::actingAs($user);
+        $this->fakeGeminiReply('Respuesta');
+
+        $this->postJson("/api/chat/conversations/{$conversation->id}/messages", [
+            'message' => 'Último mensaje',
+        ])->assertOk();
+
+        Http::assertSent(function ($request) {
+            $texts = collect($request->data()['contents'])->pluck('parts.0.text');
+
+            return $texts->first() === 'Mensaje 11'
+                && $texts->contains('Mensaje 30')
+                && ! $texts->contains('Mensaje 1')
+                && $texts->last() === 'Último mensaje';
+        });
+    }
+
+    public function test_custom_conversation_title_is_preserved(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::factory()->create([
+            'user_id' => $user->id,
+            'title' => 'Frenos de mi moto',
+        ]);
+        Sanctum::actingAs($user);
+        $this->fakeGeminiReply('Respuesta');
+
+        $this->postJson("/api/chat/conversations/{$conversation->id}/messages", [
+            'message' => 'Hola',
+        ])->assertOk();
+
+        $this->assertSame('Frenos de mi moto', $conversation->refresh()->title);
+    }
+
+    public function test_off_topic_message_is_declined_by_the_domain_filter(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::factory()->create(['user_id' => $user->id]);
+        Message::factory()->create([
+            'conversation_id' => $conversation->id,
+            'role' => 'user',
+            'content' => '¿Qué aceite le hace a mi moto 150cc?',
+        ]);
+        Sanctum::actingAs($user);
+
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::sequence()
+                ->push(['candidates' => [['content' => ['parts' => [['text' => 'NO']], 'role' => 'model']]]], 200)
+                ->push(['candidates' => [['content' => ['parts' => [['text' => 'Receta de arroz con pollo']], 'role' => 'model']]]], 200),
+        ]);
+
+        $this->postJson("/api/chat/conversations/{$conversation->id}/messages", [
+            'message' => 'Cómo preparar arroz con pollo',
+        ])->assertOk()->assertJson(['respuesta' => GeminiService::OUT_OF_DOMAIN_REPLY]);
+
+        Http::assertSentCount(1);
+    }
+
+    private function fakeGeminiReply(string $text): void
+    {
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => Http::response([
+                'candidates' => [
+                    ['content' => ['parts' => [['text' => $text]], 'role' => 'model']],
+                ],
+            ], 200),
+        ]);
     }
 
     public function test_user_can_retrieve_message_history(): void

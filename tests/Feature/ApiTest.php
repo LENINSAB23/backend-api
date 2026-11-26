@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 class ApiTest extends TestCase
@@ -27,9 +28,9 @@ class ApiTest extends TestCase
     public function test_can_receive_telemetry_location()
     {
         $driver = User::factory()->create(['role' => 'driver']);
+        Sanctum::actingAs($driver);
 
         $response = $this->postJson('/api/telemetry/location', [
-            'driver_id' => $driver->id,
             'latitude' => -9.9306,
             'longitude' => -76.2422,
             'altitude' => 1900.5,
@@ -43,6 +44,8 @@ class ApiTest extends TestCase
 
     public function test_can_fetch_orders()
     {
+        Sanctum::actingAs(User::factory()->create());
+
         $response = $this->getJson('/api/orders');
         $response->assertStatus(200)
             ->assertJsonStructure(['status', 'data']);

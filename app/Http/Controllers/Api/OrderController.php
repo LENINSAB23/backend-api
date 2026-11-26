@@ -8,25 +8,37 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
     public function index(Request $request)
     {
+        $user = $request->user();
+
         $query = Order::with(['items.product', 'driver', 'customer', 'latestTelemetry'])
             ->orderBy('created_at', 'desc');
 
+        if ($user->isAdmin()) {
+            if ($request->has('driver_id')) {
+                $query->where('driver_id', $request->driver_id);
+            }
+
+            if ($request->has('customer_id')) {
+                $query->where('customer_id', $request->customer_id);
+            }
+        } elseif ($user->isDriver()) {
+            $query->where(function ($driverScope) use ($user) {
+                $driverScope->where('driver_id', $user->id)->orWhereNull('driver_id');
+            });
+        } else {
+            $query->where('customer_id', $user->id);
+        }
+
         if ($request->has('status')) {
             $query->where('status', $request->status);
-        }
-
-        if ($request->has('driver_id')) {
-            $query->where('driver_id', $request->driver_id);
-        }
-
-        if ($request->has('customer_id')) {
-            $query->where('customer_id', $request->customer_id);
         }
 
         $orders = $query->get();
@@ -76,7 +88,7 @@ class OrderController extends Controller
 
             $order = Order::create([
                 'order_number' => $orderNumber,
-                'customer_id' => $request->user() ? $request->user()->id : null,
+                'customer_id' => $request->user()->id,
                 'customer_name' => $validated['customer_name'],
                 'customer_phone' => $validated['customer_phone'],
                 'delivery_address' => $validated['delivery_address'],
@@ -111,6 +123,8 @@ class OrderController extends Controller
             $q->orderBy('recorded_at', 'desc')->limit(20);
         }])->findOrFail($id);
 
+        Gate::authorize('view', $order);
+
         return response()->json([
             'status' => 'success',
             'data' => $order,
@@ -120,6 +134,8 @@ class OrderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $order = Order::findOrFail($id);
+
+        Gate::authorize('updateStatus', $order);
 
         $validated = $request->validate([
             'status' => 'required|string|in:pending,cooking,in_transit,delivered,cancelled',
@@ -143,8 +159,10 @@ class OrderController extends Controller
     {
         $order = Order::findOrFail($id);
 
+        Gate::authorize('assignDriver', $order);
+
         $validated = $request->validate([
-            'driver_id' => 'required|exists:users,id',
+            'driver_id' => ['required', Rule::exists('users', 'id')->where('role', 'driver')],
         ]);
 
         $order->driver_id = $validated['driver_id'];
