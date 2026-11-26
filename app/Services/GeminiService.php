@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Conversation;
+use App\Models\Product;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -48,7 +49,7 @@ class GeminiService
                         'text' => "Eres RinoBot, el asistente inteligente y asesor técnico oficial de la plataforma 'Grupo Rino E.I.R.L.' en Huánuco, Perú (empresa líder en venta de repuestos y lubricantes para autos y motocicletas, servicio de taller mecánico, pedidos y rastreo satelital GPS).\n\n"
                             ."RESTRICCIÓN ESTRICTA DE DOMINIO Y GUARDRAILS OBLIGATORIOS:\n"
                             ."1. ALCANCE EXCLUSIVO: Únicamente debes responder preguntas vinculadas directamente con:\n"
-                            ."   - La aplicación móvil y web de Grupo Rino (funciones de la app, catálogo de repuestos, cotizaciones, carrito de compras, proceso de pedido, medios de pago como Yape/Plin/tarjeta/contraentrega, rastreo satelital GPS en vivo y cálculo de tiempo de entrega ETA con IA).\n"
+                            ."   - La aplicación móvil y web de Grupo Rino (funciones de la app, catálogo de repuestos, cotizaciones, carrito de compras, proceso de pedido, medios de pago aceptados: Yape, tarjeta y efectivo contraentrega, rastreo satelital GPS en vivo y cálculo de tiempo de entrega ETA con IA).\n"
                             ."   - Asesoría técnica automotriz y de motos (compatibilidad de piezas, aceites Mobil/Motul, pastillas de freno Brembo/Fras-le, baterías Capsa/Yuasa, bujías NGK, herramientas de taller, filtros y mantenimiento preventivo vehicular).\n"
                             ."   - Información comercial de Grupo Rino (horarios de atención, cobertura en Huánuco, Amarilis, Pillco Marca y atención al cliente).\n\n"
                             ."2. RECHAZO OBLIGATORIO DE CUALQUIER TEMA AJENO:\n"
@@ -58,7 +59,8 @@ class GeminiService
                             ."3. TONO Y FORMATO:\n"
                             ."   - Mantén un tono cordial, técnico, seguro y conciso.\n"
                             ."   - Utiliza viñetas y formato Markdown legible.\n"
-                            .'   - Todos los precios deben expresarse en Soles peruanos (S/).',
+                            .'   - Todos los precios deben expresarse en Soles peruanos (S/).'
+                            .$this->catalogContext(),
                     ],
                 ],
             ],
@@ -120,6 +122,40 @@ class GeminiService
         }
 
         return trim($text);
+    }
+
+    /**
+     * Current catalog sent to Gemini on every question (retrieval step), so
+     * RinoBot only recommends products that Grupo Rino actually sells.
+     */
+    protected function catalogContext(): string
+    {
+        $products = Product::query()
+            ->with('category')
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
+        if ($products->isEmpty()) {
+            return '';
+        }
+
+        $lines = $products->map(fn (Product $product): string => sprintf(
+            '- %s | %s | S/ %s | %s',
+            $product->name,
+            $product->category?->name ?? 'Sin categoría',
+            number_format((float) $product->price, 2),
+            $product->stock > 0 ? "stock: {$product->stock}" : 'agotado',
+        ))->implode(PHP_EOL);
+
+        return implode(PHP_EOL, [
+            '',
+            '',
+            '4. CATÁLOGO ACTUAL DE GRUPO RINO (fuente de verdad):',
+            '   - Recomienda ÚNICAMENTE productos de esta lista, con su nombre y precio exactos.',
+            '   - Si ningún producto encaja, dilo con claridad y sugiere consultar en tienda; no inventes marcas ni productos.',
+            $lines,
+        ]);
     }
 
     /**

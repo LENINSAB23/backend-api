@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\GeminiService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -222,6 +223,28 @@ class ChatTest extends TestCase
         ])->assertOk()->assertJson(['respuesta' => GeminiService::OUT_OF_DOMAIN_REPLY]);
 
         Http::assertSentCount(1);
+    }
+
+    public function test_gemini_receives_the_current_product_catalog(): void
+    {
+        $user = User::factory()->create();
+        $conversation = Conversation::factory()->create(['user_id' => $user->id]);
+        Product::factory()->create(['name' => 'Bujía NGK CR7HSA', 'price' => 18.5, 'is_active' => true]);
+        Product::factory()->create(['name' => 'Producto descontinuado', 'is_active' => false]);
+        Sanctum::actingAs($user);
+        $this->fakeGeminiReply('Respuesta');
+
+        $this->postJson("/api/chat/conversations/{$conversation->id}/messages", [
+            'message' => '¿Qué bujía tienen?',
+        ])->assertOk();
+
+        Http::assertSent(function ($request) {
+            $system = $request->data()['systemInstruction']['parts'][0]['text'] ?? '';
+
+            return str_contains($system, 'Bujía NGK CR7HSA | ')
+                && str_contains($system, 'S/ 18.50')
+                && ! str_contains($system, 'Producto descontinuado');
+        });
     }
 
     private function fakeGeminiReply(string $text): void
